@@ -1,12 +1,31 @@
 
 import re
+import os
+import json
 from datetime import datetime as dt
 
 
 dev = True
 
+
+def workDirectory():
+    CURR_DIR = os.path.dirname(os.path.realpath(__file__))
+    return removeRegexText(r'\\pylib\\mod', CURR_DIR)
+
+
+def parameters(isTest=True):
+    config_file = r'{}\util\config.json'.format(workDirectory())
+    with open(config_file) as cdata:
+        config = json.load(cdata)
+
+    db_con = config['db_con']
+    files = config['files']
+    return (db_con, files)
+
+
 def roundBy(x, base=1):
     return int(base * round(float(x)/base))
+
 
 def excutionTime(func):
     def wrapper(*args, **kwargs):
