@@ -5,6 +5,8 @@ from datetime import datetime as dt
 
 dev = True
 
+def roundBy(x, base=1):
+    return int(base * round(float(x)/base))
 
 def excutionTime(func):
     def wrapper(*args, **kwargs):

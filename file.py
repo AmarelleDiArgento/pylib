@@ -2,7 +2,7 @@
 import os
 import re
 import pandas as pd
-from lib.mod.error import packageForFileError
+from pylib.mod.error import packageForFileError
 
 
 def searchFilesByContentInTitle(url, parm):

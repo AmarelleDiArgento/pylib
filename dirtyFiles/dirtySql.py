@@ -12,15 +12,7 @@ TRANSACCIONES SQL
 """
 
 
-dbProjCon = {
-    'server': 'elt-dbproj-fca\\testing',
-    'db': 'Reports',
-    'user': 'talend',
-    'password': 'S3rvT4l3nd*',
-}
-
-schema = 'trn'
-tables = ['Budget', 'Shop']
+dbProjCon = ''
 
 
 def stringConnect(con):
@@ -38,7 +30,7 @@ def engineCon(con):
     return sal.create_engine(con)
 
 
-def insertDataToSql(srtCon, schema, table, data):
+def insertDataToSqlDirty(srtCon, schema, table, data):
     data.to_sql(
         schema=schema,
         name=table,
