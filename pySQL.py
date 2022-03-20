@@ -1,10 +1,19 @@
 
-from pylib.mod.utils import roundBy
+
+from importlib import metadata
+from pylib.mod.utils import excutionTime, roundBy
 # import pymssql as db
 import sqlalchemy as db
+from sqlalchemy.orm import Session
+from sqlalchemy import create_engine as sen, text as sat
+from sqlalchemy.schema import Table,  MetaData, Column
+from sqlalchemy.types import Integer, DateTime, String, Float, Boolean
 
-from sqlalchemy import create_engine as sen
-from sqlalchemy.sql import text as sat
+import math
+
+# from sqlalchemy import Profiler
+
+# Profiler.init("bulk_inserts", num=100000)
 
 
 def stringConnect(con):
@@ -51,9 +60,10 @@ def affectedRows(func):
     return wrapper
 
 
-@affectedRows
 def truncateTable(strCon, schema, table):
-    TruncateTable = 'TRUNCATE TABLE [{}].[{}];'
+    ifexist = '''IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[{}].[{}]') AND type in (N'U'))\n'''.format(
+        schema, table)
+    TruncateTable = ifexist + 'TRUNCATE TABLE [{}].[{}];'
     engineCon(strCon).execute(
         sat(
             TruncateTable.format(schema, table)
@@ -73,6 +83,54 @@ def insertDataToSql(strCon, schema, table, data, truncate=False, index=False):
         con=engineCon(strCon),
         if_exists=if_exists,
         index=False
+    )
+
+
+def alchemy_col(name, type, leng):
+    switch = {
+        'int64': Integer,
+        'float64': Float,
+        'bool': Boolean,
+        'datetime64[ns]': DateTime
+    }
+    # print(name, type, leng,  switch.get(type, String(leng)))
+    return Column(name, switch.get(type, String(leng)))
+
+
+# @affectedRows
+
+# @Profiler.profile
+def insertDataToSql_Alchemy(strCon, schema, table, data, truncate=False, index=False, n=10000):
+    Columns = createTable(strCon, schema, table, data, index)
+
+    table = Table(
+        table,
+        MetaData(bind=engineCon(strCon)),
+        *Columns,
+        schema=schema
+    )
+    if truncate:
+        truncateTable(strCon, schema, table)
+
+    total = data.shape[0]
+    cicle = math.floor(total / n)
+    residue = total % n
+    ini = 0
+    end = n
+
+    for n in range(0, cicle):
+
+        df = data.iloc[ini:end]
+        engineCon(strCon).execute(
+            table.insert(), df.to_dict(orient='records')
+        )
+        ini = fin
+        fin = fin + n
+        print('insert {} to {} rows'.format(fin, total))
+
+    df = data.iloc[ini:total]
+    engineCon(strCon).execute(
+        table.insert(), df.to_dict(orient='records')
     )
 
 
@@ -104,6 +162,7 @@ def createTableStament(data, schema='dbo', table='newTable', index=False):
         '<M8[ns]': 'NPI',
         'object': 'nvarchar'
     }
+    columns = []
     stament = ''
     if index:
         stament = '\t[ID_{}] int identity(1,1)'.format(table)
@@ -118,19 +177,22 @@ def createTableStament(data, schema='dbo', table='newTable', index=False):
             largo = roundBy(largo, base=10) + 10
             tipo = '{}({})'.format(tipo, largo)
 
+        columns.append(alchemy_col(c, str(data[c].dtype), largo))
+
         stament += '\t[{}] {}'.format(c, tipo)
 
-    return '''
+    return ('''
     IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[{}].[{}]') AND type in (N'U'))
     CREATE TABLE [{}].[{}] (\n{})
-    '''.format(schema, table, schema, table, stament)
+    '''.format(schema, table, schema, table, stament), columns)
 
 
 def createTable(strCon, schema, table, data, index=False):
-    TableStament = createTableStament(data, schema, table, index)
+    TableStament, Columns = createTableStament(data, schema, table, index)
     # print(TableStament)
     engineCon(strCon).execute(
         sat(
             TableStament
         ).execution_options(autocommit=True)
     )
+    return Columns

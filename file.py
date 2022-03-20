@@ -5,6 +5,8 @@ import pandas as pd
 from pylib.mod.error import packageForFileError
 import os
 
+from pylib.mod.utils import excutionTime
+
 
 def searchFilesByContentInTitle(url, parm):
     allFilesInUrl = os.listdir(url)
@@ -61,6 +63,7 @@ def removeColumnsIn(dataFrame, listToRemove, notIn=False):
     return dataFrame
 
 
+@excutionTime
 def blockExtractDataFile(url, files, sheet, firstRow=0):
 
     data = pd.DataFrame()
@@ -72,6 +75,7 @@ def blockExtractDataFile(url, files, sheet, firstRow=0):
     return columnCleaner(data)
 
 
+@excutionTime
 def extractDataFile(url, file, sheet, firstRow=0):
     try:
         data = pd.read_excel(url + file, sheet, header=firstRow)
