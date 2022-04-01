@@ -1,20 +1,42 @@
 
+
+from operator import contains
 import os
+import shutil
 import re
+from xlsx2csv import Xlsx2csv
 import pandas as pd
 from pylib.mod.error import packageForFileError
 import os
 
-from pylib.mod.utils import excutionTime
+from pylib.mod.utils import excutionTime, replaceIfContains
 
 
-def searchFilesByContentInTitle(url, parm):
-    allFilesInUrl = os.listdir(url)
+def createDirectory(url):
+    if not os.path.exists(url):
+        os.makedirs(url)
+
+
+@excutionTime
+def searchFilesByContentInTitle(file_path, parm):
+    allFilesInUrl = os.listdir(file_path)
     return [x for x in allFilesInUrl if(
         ~x.startswith('~$') &
-        (re.search(parm['content'], x.lower()) is not None) &
+        (re.search(parm['content'].lower(), x.lower()) is not None) &
         x.endswith(parm['ext'])
     )]
+
+
+def blockExtractDataFile(path, files, sheets, firstRow=0):
+    data = pd.DataFrame()
+    for file in files:
+        file_path = path + file
+        if data is not None:
+            data = pd.concat([data,
+                              extractDataFile(file_path, file, sheets, firstRow)]
+                             )
+
+    return data
 
 
 def columnCleaner(dataFrame):
@@ -63,37 +85,83 @@ def removeColumnsIn(dataFrame, listToRemove, notIn=False):
     return dataFrame
 
 
-@excutionTime
-def blockExtractDataFile(url, files, sheet, firstRow=0):
-
-    data = pd.DataFrame()
-    for file in files:
-        if data is not None:
-            data = pd.concat([data,
-                              extractDataFile(url, file, sheet, firstRow)]
-                             )
-    return columnCleaner(data)
+def existsFile(filepath):
+    return os.path.isfile(filepath)
 
 
-@excutionTime
-def extractDataFile(url, file, sheet, firstRow=0):
+def removeFile(filepath):
+    os.remove(filepath)
+
+
+def removeDirectory(url):
     try:
-        data = pd.read_excel(url + file, sheet, header=firstRow)
-        data['Url'] = file
-        #
+        if os.path.exists(url):
+            shutil.rmtree(url)
+    except OSError as e:
+        print(f"Error:{ e.strerror}")
+
+
+# @excutionTime
+def convertXlsToCsv(url, file, sheets, isTest=False):
+    filepath = url + file
+    # print('Existe el archivo xls? {}'.format(existsFile(filepath)))
+    if existsFile(filepath):
+        if isTest:
+            filepath = filepath.replace('xlsx', 'csv')
+            # print('Existe el archivo csv? {}'.format(existsFile(filepath)))
+            if existsFile(filepath) == False and existsFile(url+file) == True:
+                Xlsx2csv(
+                    url+file,
+                    outputencoding="ISO-8859-1",
+                    delimiter=';',
+                    include_sheet_pattern=sheets
+                ).convert(filepath, 0)
+    else:
+        return None
+
+    return filepath
+
+
+# @excutionTime
+def extractDataFile(file_path, file, sheets, firstRow=0):
+    try:
+        data = pd.DataFrame()
+        if contains(file_path, 'csv'):
+            data = pd.read_csv(
+                file_path, encoding='ISO-8859-1', sep=';')
+        elif contains(file_path, 'xls'):
+            for sheet in sheets:
+                data = pd.concat([data,
+                                  pd.read_excel(
+                                      file_path,
+                                      sheet_name=sheet,
+                                      header=firstRow)
+                                  ])
+        else:
+            return None
+
+        data['source'] = file
+        data = columnCleaner(data)
+        data = trimAllColumns(data)
+
         return data
     except (ValueError, NameError):
-        #                   (url, error, file)
         packageForFileError(
-            url,
+            file_path,
             "No se encuentra la pestaña {}.\n".format(sheet),
             file
         )
         return None
     except PermissionError:
         packageForFileError(
-            url,
+            file_path,
             "El archivo {}, esta en uso al momento de cargar.\n".format(file),
+            file)
+        return None
+    except (TypeError) as e:
+        packageForFileError(
+            file_path,
+            "Error: {}.\n".format(e),
             file)
         return None
 

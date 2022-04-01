@@ -20,7 +20,8 @@ def parameters(isTest=True):
 
     db_con = config['db_con']
     files = config['files']
-    return (db_con, files)
+    isTest = config['isTest']
+    return (db_con, files, isTest)
 
 
 def roundBy(x, base=1):
@@ -29,13 +30,14 @@ def roundBy(x, base=1):
 
 def excutionTime(func):
     def wrapper(*args, **kwargs):
+        # print('args:', args)
         if (dev):
             initial = dt.now()
             results = func(*args, **kwargs)
             final = dt.now()
             difference = final - initial
             # print('F {}: {}\nArgs: {}'.format(func.__name__, difference, args))
-            print('F {}: {}'.format(func.__name__, difference))
+            print('f_{}: {}'.format(func.__name__, difference))
         return results
 
     return wrapper

@@ -1,6 +1,8 @@
 
 
 from importlib import metadata
+
+import numpy as np
 from pylib.mod.utils import excutionTime, roundBy
 # import pymssql as db
 import sqlalchemy as db
@@ -98,7 +100,6 @@ def alchemy_col(name, type, leng):
 
 
 # @affectedRows
-
 # @Profiler.profile
 def insertDataToSql_Alchemy(strCon, schema, table, data, truncate=False, index=False, n=10000):
     Columns = createTable(strCon, schema, table, data, index)
@@ -118,20 +119,27 @@ def insertDataToSql_Alchemy(strCon, schema, table, data, truncate=False, index=F
     ini = 0
     end = n
 
-    for n in range(0, cicle):
+    for _ in range(33, cicle):
 
         df = data.iloc[ini:end]
+        df = df.replace(np.nan, 0)
+        dic = df.to_dict(orient='records')
+
         engineCon(strCon).execute(
-            table.insert(), df.to_dict(orient='records')
+            table.insert(), dic
         )
-        ini = fin
-        fin = fin + n
-        print('insert {} to {} rows'.format(fin, total))
+        ini = end
+        end = end + n
+        print('insert {} to {} rows'.format(end, total))
 
     df = data.iloc[ini:total]
+    df = df.replace(np.nan, 0)
+    dic = df.to_dict(orient='records')
     engineCon(strCon).execute(
-        table.insert(), df.to_dict(orient='records')
+        table.insert(), dic
     )
+    
+    print('insert {} to {} rows'.format(total, total))
 
 
 @affectedRows
@@ -143,7 +151,7 @@ def deleteDataToSql(strCon, schema, table, where=[]):
         deleteData += '\n\tAND ' + w
 
     deleteData = 'DELETE FROM [{}].[{}]'+deleteData + ';'
-    print(deleteData)
+    # print(deleteData)
     engineCon(strCon).execute(
         sat(
             deleteData.format(schema, table)

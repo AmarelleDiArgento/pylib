@@ -127,3 +127,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+
+# Ignore All excel files (xlsx, xls, csv) files
+*.xlsx
+*.xls
+*.csv
