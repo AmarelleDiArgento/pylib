@@ -4,6 +4,8 @@ import os
 import json
 from datetime import datetime as dt
 
+from numpy import NAN, NaN
+
 
 dev = True
 
@@ -25,7 +27,11 @@ def parameters(isTest=True):
 
 
 def roundBy(x, base=1):
-    return int(base * round(float(x)/base))
+    if x is not NAN:
+        return int(base * round(float(x) / base))
+    else:
+        return 10
+    # return int(base * round(float(x)/base))
 
 
 def excutionTime(func):

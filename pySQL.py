@@ -1,10 +1,9 @@
 
 
-from importlib import metadata
-
+from cmath import nan
 import numpy as np
 from pylib.mod.utils import excutionTime, roundBy
-# import pymssql as db
+import pymssql as sql
 import sqlalchemy as db
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine as sen, text as sat
@@ -63,9 +62,11 @@ def affectedRows(func):
 
 
 def truncateTable(strCon, schema, table):
+
     ifexist = '''IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[{}].[{}]') AND type in (N'U'))\n'''.format(
         schema, table)
-    TruncateTable = ifexist + 'TRUNCATE TABLE [{}].[{}];'
+    TruncateTable = ifexist + 'TRUNCATE TABLE [{}].[{}];'.format(schema, table)
+    # print(TruncateTable)
     engineCon(strCon).execute(
         sat(
             TruncateTable.format(schema, table)
@@ -101,48 +102,58 @@ def alchemy_col(name, type, leng):
 
 # @affectedRows
 # @Profiler.profile
-def insertDataToSql_Alchemy(strCon, schema, table, data, truncate=False, index=False, n=10000):
+def insertDataToSql_Alchemy(strCon, schema, table, data, truncate=False, depureColumns=[], index=False, n=10000):
+
     Columns = createTable(strCon, schema, table, data, index)
+    try:
 
-    table = Table(
-        table,
-        MetaData(bind=engineCon(strCon)),
-        *Columns,
-        schema=schema
-    )
-    if truncate:
-        truncateTable(strCon, schema, table)
+        if truncate:
+            truncateTable(strCon, schema, table)
 
-    total = data.shape[0]
-    cicle = math.floor(total / n)
-    residue = total % n
-    ini = 0
-    end = n
+        if depureColumns.__len__() > 0:
+            depure(strCon, data, schema, table, depureColumns)
 
-    for _ in range(33, cicle):
+        table = Table(
+            table,
+            MetaData(bind=engineCon(strCon)),
+            *Columns,
+            schema=schema
+        )
 
-        df = data.iloc[ini:end]
+        total = data.shape[0]
+        cicle = math.floor(total / n)
+        residue = total % n
+        ini = 0
+        end = n
+
+        for _ in range(33, cicle):
+
+            df = data.iloc[ini:end]
+            df = df.replace(np.nan, 0)
+            dic = df.to_dict(orient='records')
+
+            engineCon(strCon).execute(
+                table.insert(), dic
+            )
+            ini = end
+            end = end + n
+            print('insert {} to {} rows'.format(end, total))
+
+        df = data.iloc[ini:total]
         df = df.replace(np.nan, 0)
         dic = df.to_dict(orient='records')
-
         engineCon(strCon).execute(
             table.insert(), dic
         )
-        ini = end
-        end = end + n
-        print('insert {} to {} rows'.format(end, total))
 
-    df = data.iloc[ini:total]
-    df = df.replace(np.nan, 0)
-    dic = df.to_dict(orient='records')
-    engineCon(strCon).execute(
-        table.insert(), dic
-    )
-    
-    print('insert {} to {} rows'.format(total, total))
+        print('insert {} to {} rows'.format(total, total))
+    except sql.Error as ex:  # Bad >:[
+        raise ex
+    except Exception as ex:  # Bad. >:[
+        raise ex
 
 
-@affectedRows
+# @affectedRows
 def deleteDataToSql(strCon, schema, table, where=[]):
     deleteData = ''
     for w in where:
@@ -157,6 +168,21 @@ def deleteDataToSql(strCon, schema, table, where=[]):
             deleteData.format(schema, table)
         ).execution_options(autocommit=True)
     )
+
+
+def depure(strCon, df, schema, table, depureColumns):
+
+    depure = df.loc[:, depureColumns].drop_duplicates(subset=depureColumns)
+
+    # print(depure.shape[0])
+    for i in range(depure.shape[0]):
+        where = []
+        for k in depureColumns:
+            w = '''{} = '{}' '''.format(k, depure.iloc[i][k])
+            where.append(w)
+        # print(where)
+
+        deleteDataToSql(strCon, schema, table, where=where)
 
 
 def createTableStament(data, schema='dbo', table='newTable', index=False):

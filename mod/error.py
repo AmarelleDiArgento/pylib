@@ -4,7 +4,7 @@ import datetime as dt
 from pylib.mod.utils import workDirectory
 
 
-def packageForFileError(url, error, file):
+def packageForFileError(test, url, error, file):
     directory = workDirectory() + chr(92)+'Procesado' + chr(92)
 
     urllog = directory + dt.datetime.today().strftime("%Y%m%d")

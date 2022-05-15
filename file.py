@@ -7,9 +7,8 @@ import re
 from xlsx2csv import Xlsx2csv
 import pandas as pd
 from pylib.mod.error import packageForFileError
-import os
-
-from pylib.mod.utils import excutionTime, replaceIfContains
+from pylib.mod.utils import excutionTime
+import datetime as dt
 
 
 def createDirectory(url):
@@ -27,16 +26,35 @@ def searchFilesByContentInTitle(file_path, parm):
     )]
 
 
-def blockExtractDataFile(path, files, sheets, firstRow=0):
+def blockExtractDataFile(path, files, sheets, firstRow=0, archive=True):
     data = pd.DataFrame()
     for file in files:
-        file_path = path + file
         if data is not None:
             data = pd.concat([data,
-                              extractDataFile(file_path, file, sheets, firstRow)]
+                              extractDataFile(path, file, sheets, firstRow)]
                              )
 
     return data
+
+
+def createDirectory(archive):
+    if not os.path.exists(archive):
+        os.makedirs(archive, exist_ok=True)
+
+
+def archiveFile(path, file):
+    src = path+file
+    if os.path.exists(src):
+
+        date = dt.datetime.now()
+        day = date.strftime('%Y-%m-%d')
+        hour = date.strftime('%H%M')
+        dst = path + 'storage' + chr(92) + day
+
+        createDirectory(dst)
+        dst = dst + chr(92) + hour + '_' + file
+
+        shutil.move(src, dst)
 
 
 def columnCleaner(dataFrame):
@@ -123,8 +141,9 @@ def convertXlsToCsv(url, file, sheets, isTest=False):
 
 
 # @excutionTime
-def extractDataFile(file_path, file, sheets, firstRow=0):
+def extractDataFile(path, file, sheets, firstRow=0):
     try:
+        file_path = path + file
         data = pd.DataFrame()
         if contains(file_path, 'csv'):
             data = pd.read_csv(
@@ -144,6 +163,7 @@ def extractDataFile(file_path, file, sheets, firstRow=0):
         data = columnCleaner(data)
         data = trimAllColumns(data)
 
+        archiveFile(path, file)
         return data
     except (ValueError, NameError):
         packageForFileError(
