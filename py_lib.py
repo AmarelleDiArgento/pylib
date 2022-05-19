@@ -48,6 +48,7 @@ def directories(ROOT, files, directories):
                 new_directory
             )
             file[directory] = new_directory
+    # print(files)
     return files
 
 
@@ -56,7 +57,6 @@ def parameters(ROOT, isTest=True):
     config_file = r'{}\util\config.json'.format(ROOT)
     with open(config_file) as cdata:
         config = json.load(cdata)
-
     db_con = config['db_con']
     files = directories(ROOT, config['files'], ['storage', 'logs'])
     isTest = config['isTest']
@@ -422,8 +422,7 @@ def alchemy_col(name, type, leng):
     return Column(name, switch.get(type, String(leng)))
 
 
-# @affectedRows
-# @Profiler.profile
+@affectedRows
 def insertDataToSql_Alchemy(strCon, schema, table, data, truncate=False, depureColumns=[], index=False, n=10000):
 
     Columns = createTable(strCon, schema, table, data, index)
@@ -493,7 +492,7 @@ def deleteDataToSql(strCon, schema, table, where=[]):
 
 
 def depure(strCon, df, schema, table, depureColumns):
-    print(df)
+    # print(depureColumns)
     depure = df.loc[:, depureColumns].drop_duplicates(subset=depureColumns)
 
     # print(depure.shape[0])
