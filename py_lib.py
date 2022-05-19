@@ -1,4 +1,5 @@
 
+from itertools import groupby
 import re
 import os
 import json
@@ -8,6 +9,7 @@ from operator import contains
 import os
 import shutil
 import re
+from typing import Literal
 from xlsx2csv import Xlsx2csv
 import pandas as pd
 
@@ -51,15 +53,21 @@ def directories(ROOT, files, directories):
     return files
 
 
-def parameters(ROOT, isTest=True):
-    # print(ROOT)
-    config_file = r'{}\util\config.json'.format(ROOT)
+def parameters(ROOT, isTest=True, config_file='', service_name='general',):
+
+    config_file = r'{}\util\{}'.format(
+        ROOT, (config_file, 'config.json')[config_file == ''])
+
     with open(config_file) as cdata:
         config = json.load(cdata)
 
-    db_con = config['db_con']
-    files = directories(ROOT, config['files'], ['storage', 'logs'])
     isTest = config['isTest']
+
+    db_con = config[service_name]['db_con']
+    files = None
+    if 'files' in config.values():
+        files = directories(ROOT, config['files'], ['storage', 'logs'])
+
     return (db_con, files, isTest)
 
 
@@ -207,23 +215,22 @@ def columnCleaner(dataFrame):
     return dataFrame
 
 
-def removeColumnsIn(dataFrame, listToRemove, notIn=False):
+def removeColumnsIn(dataFrame, listToRemove=[], notIn=False, literal=False):
     # Eliminar columnas repetidas.
-
     pattern = '|'.join(listToRemove)
-
-    if(~notIn):
+    if literal:
         dataFrame.drop(
-            dataFrame.columns[
-                dataFrame.columns.str.contains(pat=pattern, regex=True)
-            ],
+            listToRemove,
             axis=1,
             inplace=True
         )
     else:
         dataFrame.drop(
             dataFrame.columns[
-                ~dataFrame.columns.str.contains(pat=pattern, regex=True)
+                (
+                    dataFrame.columns.str.contains(pat=pattern, regex=True),
+                    ~dataFrame.columns.str.contains(pat=pattern, regex=True)
+                )[notIn]
             ],
             axis=1,
             inplace=True
@@ -330,7 +337,7 @@ def trimAllColumns(dataFrame):
 
 
 # ----------------------------------------------------------------------------------------------------
-#  Lib SQL
+#  Lib sqlAlchemy
 # ----------------------------------------------------------------------------------------------------
 
 
@@ -366,6 +373,79 @@ def rowCount(strCon, schema, table):
 
     except:
         return 0
+
+
+def field_builder(fields, type_fields='S'):
+    '''
+    @fields: list of fields
+    @type: S Select, G Group By, O Order By
+    '''
+
+    if type_fields == 'S' and fields is None:
+        return '*'
+    elif (type_fields == 'G' or type_fields == 'O') and fields is None:
+        return ''
+    else:
+
+        pre = {
+            'S': '[',
+            'G': 'GROUP BY [',
+            'O': 'ORDER BY ['
+        }
+
+        join = pre[type_fields]
+        join = join + '], ['.join(fields)
+        return join + ']'
+
+
+def where_builder(where=[]):
+    whereData = ''
+    if where is not None:
+        for w in where:
+            if whereData == '':
+                whereData += 'WHERE ' + w
+            whereData += '\n\tAND ' + w
+    else:
+        whereData = ''
+    return whereData
+
+
+def query_builder(schema, table, fields=None, where=None, grouopby=None, orderby=None, limit=None):
+
+    ifexist = '''IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[{}].[{}]') AND type in (N'U'))\n'''.format(
+        schema, table)
+
+    query = ifexist + '\tSELECT {} {} FROM [{}].[{}] WITH(NOLOCK)'.format(
+        ('Top {limit} ', '')[limit is None], field_builder(fields=fields, type_fields='S'), schema, table)
+    query = query + '\n' + where_builder(where)
+    query = query + '\n\t{}'.format(
+        field_builder(fields=grouopby, type_fields='G'), schema, table)
+    query = query + '\n\t{}'.format(
+        field_builder(fields=orderby, type_fields='O'), schema, table)
+
+    return query
+
+
+def excecute_query(strCon, schema=None, table=None, query='', fields=None, where=None, grouopby=None, orderby=None, limit=None):
+    try:
+        if query == '':
+            query = query_builder(
+                schema, table, fields, where, grouopby, orderby, limit)
+
+        # print(query)
+        data_source = engineCon(strCon).execute(
+            sat(
+                query
+            ).execution_options(stream_results=True)
+        )
+        data_source = data_source.mappings().all()
+        data_source = pd.DataFrame(data_source)
+        data_source = trimAllColumns(data_source)
+
+        return data_source
+
+    except:
+        return pd.DataFrame()
 
 
 def affectedRows(func):
