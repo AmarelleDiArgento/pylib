@@ -64,11 +64,17 @@ def parameters(ROOT, isTest=True, config_file='', service_name='general',):
     isTest = config['isTest']
 
     db_con = config[service_name]['db_con']
+
     files = None
-    if 'files' in config.values():
+    if 'files' in config:
         files = directories(ROOT, config['files'], ['storage', 'logs'])
 
-    return (db_con, files, isTest)
+    bulk_space = None
+    if 'bulk_space' in db_con:
+        bulk_space = db_con['bulk_space'] + chr(92)
+        del db_con['bulk_space']
+
+    return (db_con, files, isTest, bulk_space)
 
 
 def roundBy(x, base=1):
@@ -472,6 +478,34 @@ def truncateTable(strCon, schema, table):
     engineCon(strCon).execute(
         sat(
             TruncateTable.format(schema, table)
+        ).execution_options(autocommit=True)
+    )
+
+
+@affectedRows
+def bulkInsert(strCon, schema, table, file_path, data, index=False):
+    createTable(strCon, schema, table, data, index)
+
+    ifexist = '''IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[{}].[{}]') AND type in (N'U'))\n'''.format(
+        schema, table)
+    BULK = ifexist + \
+        '''
+        BULK INSERT [{}].[{}]
+            FROM '{}' 
+            WITH ( 
+                DATAFILETYPE = 'char', 
+                FIELDQUOTE = '"', 
+                FIRSTROW = 2, 
+                FIELDTERMINATOR = ';', 
+                ROWTERMINATOR = '\\n', 
+                TABLOCK 
+            );
+        '''.format(
+            schema, table, file_path)
+    # print(TruncateTable)
+    engineCon(strCon).execute(
+        sat(
+            BULK
         ).execution_options(autocommit=True)
     )
 
