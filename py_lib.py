@@ -410,6 +410,7 @@ def where_builder(where=[]):
         for w in where:
             if whereData == '':
                 whereData += 'WHERE ' + w
+                continue
             whereData += '\n\tAND ' + w
     else:
         whereData = ''
@@ -462,7 +463,8 @@ def affectedRows(func):
         finalrows = rowCount(
             kwargs['strCon'], kwargs['schema'], kwargs['table'])
         affectedRows = finalrows - initialrows
-        print('{} to {} affectedRows: {}'.format(
+
+        print('{} to {} affectedRows: {:,.1f}'.format(
             func.__name__, kwargs['table'], affectedRows))
         return results
 
@@ -589,16 +591,12 @@ def insertDataToSql_Alchemy(strCon, schema, table, data, truncate=False, depureC
         raise ex
 
 
-# @affectedRows
+@affectedRows
 def deleteDataToSql(strCon, schema, table, where=[]):
-    deleteData = ''
-    for w in where:
-        if deleteData == '':
-            deleteData += 'WHERE ' + w
-        deleteData += '\n\tAND ' + w
+    where = where_builder(where)
 
-    deleteData = 'DELETE FROM [{}].[{}]'+deleteData + ';'
-    # print(deleteData)
+    deleteData = 'DELETE FROM [{}].[{}]\n'+where + ';'
+    print(deleteData)
     engineCon(strCon).execute(
         sat(
             deleteData.format(schema, table)
