@@ -596,7 +596,7 @@ def deleteDataToSql(strCon, schema, table, where=[]):
     where = where_builder(where)
 
     deleteData = 'DELETE FROM [{}].[{}]\n'+where + ';'
-    print(deleteData)
+    # print(deleteData)
     engineCon(strCon).execute(
         sat(
             deleteData.format(schema, table)
