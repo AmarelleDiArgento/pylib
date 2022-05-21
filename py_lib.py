@@ -592,9 +592,12 @@ def insertDataToSql_Alchemy(strCon, schema, table, data, truncate=False, depureC
 
 @affectedRows
 def deleteDataToSql(strCon, schema, table, where=[]):
+
+    ifexist = '''IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[{}].[{}]') AND type in (N'U'))\n'''.format(
+        schema, table)
     where = where_builder(where)
 
-    deleteData = 'DELETE FROM [{}].[{}]\n'+where + ';'
+    deleteData = ifexist + 'DELETE FROM [{}].[{}]\n'+where + ';'
     # print(deleteData)
     engineCon(strCon).execute(
         sat(
@@ -632,7 +635,7 @@ def createTableStament(data, schema='dbo', table='newTable', index=False):
     columns = []
     stament = ''
     if index:
-        stament = '\t[ID_{}] int identity(1,1)'.format(table)
+        stament = '\t[id{}] int identity(1,1)'.format(table)
     for c in columnName:
 
         if stament != '':
