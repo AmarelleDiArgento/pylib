@@ -433,13 +433,11 @@ def query_builder(schema, table, fields=None, where=None, grouopby=None, orderby
     return query
 
 
-def excecute_query(strCon, schema=None, table=None, query='', fields=None, where=None, grouopby=None, orderby=None, limit=None):
+def excecute_query(strCon, schema=None, table=None, query='', fields=None, where=None, groupby=None, orderby=None, limit=None):
     try:
         if query == '':
             query = query_builder(
-                schema, table, fields, where, grouopby, orderby, limit)
-
-        # print(query)
+                schema, table, fields, where, groupby, orderby, limit)
         data_source = engineCon(strCon).execute(
             sat(
                 query
@@ -452,6 +450,7 @@ def excecute_query(strCon, schema=None, table=None, query='', fields=None, where
         return data_source
 
     except:
+        print('Error en la consulta: \n{}'.format(query))
         return pd.DataFrame()
 
 
@@ -486,7 +485,9 @@ def truncateTable(strCon, schema, table):
 
 @affectedRows
 def bulkInsert(strCon, schema, table, file_path, data, index=False):
-    createTable(strCon, schema, table, data, index)
+
+    if data.empty == False:
+        createTable(strCon, schema, table, data, index)
 
     ifexist = '''IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[{}].[{}]') AND type in (N'U'))\n'''.format(
         schema, table)
@@ -504,7 +505,7 @@ def bulkInsert(strCon, schema, table, file_path, data, index=False):
             );
         '''.format(
             schema, table, file_path)
-    # print(TruncateTable)
+    # print(BULK)
     engineCon(strCon).execute(
         sat(
             BULK
@@ -627,11 +628,12 @@ def createTableStament(data, schema='dbo', table='newTable', index=False):
     datetype = {
         'int64': "int",
         'float64': "float",
-        'bool': "tinyint",
+        'bool': "bit",
         'datetime64[ns]': 'datetime',
         '<M8[ns]': 'NPI',
         'object': 'nvarchar'
     }
+
     columns = []
     stament = ''
     if index:
@@ -641,6 +643,7 @@ def createTableStament(data, schema='dbo', table='newTable', index=False):
         if stament != '':
             stament += ',\n'
         tipo = datetype[str(data[c].dtype)]
+        # print(c, tipo, str(data[c].dtype))
         largo = 0
         if tipo == 'nvarchar':
             largo = data[c].str.len().max()
