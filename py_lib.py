@@ -53,21 +53,21 @@ def directories(ROOT, files, directories):
     return files
 
 
-def parameters(ROOT, isTest=True, config_file='', service_name='general',):
+def parameters(ROOT, isTest=True, config_file='', service_name='general'):
 
     config_file = r'{}\util\{}'.format(
         ROOT, (config_file, 'config.json')[config_file == ''])
 
     with open(config_file) as cdata:
         config = json.load(cdata)
-
     isTest = config['isTest']
 
     db_con = config[service_name]['db_con']
 
     files = None
-    if 'files' in config:
-        files = directories(ROOT, config['files'], ['storage', 'logs'])
+    if 'files' in config[service_name]:
+        files = directories(ROOT, config[service_name]['files'], [
+                            'storage', 'logs'])
 
     bulk_space = None
     if 'bulk_space' in db_con:
@@ -598,12 +598,15 @@ def deleteDataToSql(strCon, schema, table, where=[]):
     ifexist = '''IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[{}].[{}]') AND type in (N'U'))\n'''.format(
         schema, table)
     where = where_builder(where)
-
-    deleteData = ifexist + 'DELETE FROM [{}].[{}]\n'+where + ';'
-    # print(deleteData)
+    deleteData = '''
+        {}
+            DELETE FROM [{}].[{}]
+                {}
+        '''.format(ifexist, schema, table, where)
+    print(deleteData)
     engineCon(strCon).execute(
         sat(
-            deleteData.format(schema, table)
+            deleteData
         ).execution_options(autocommit=True)
     )
 
@@ -670,3 +673,33 @@ def createTable(strCon, schema, table, data, index=False):
         ).execution_options(autocommit=True)
     )
     return Columns
+
+
+def add_new_element(strCon, schema, table, df_new_elements,
+                    df_old_elements, column, prefix='id'):
+
+    data = pd.DataFrame(df_new_elements[column].unique(), columns=[column])
+
+    if df_old_elements.empty == False:
+        data = pd.DataFrame(data, columns=[column])
+
+        data = data.merge(df_old_elements, on=column,
+                          how='left', indicator=True)
+        data = data[data['_merge'] == 'left_only']
+
+    if data.empty == False:
+        data = removeColumnsIn(
+            dataFrame=data,
+            listToRemove=['_merge', prefix + column]
+        )
+        data = data.sort_values(column)
+
+        insertDataToSql_Alchemy(strCon=strCon, schema=schema,
+                                table=table, data=data, index=True)
+
+    return excecute_query(
+        strCon=strCon,
+        schema=schema,
+        table=table,
+        fields=[prefix + column, column]
+    )
