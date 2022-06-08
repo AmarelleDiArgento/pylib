@@ -586,8 +586,10 @@ def insertDataToSql_Alchemy(strCon, schema, table, data, truncate=False, depureC
 
         print('insert {} to {} rows'.format(total, total))
     except sql.Error as ex:  # Bad >:[
+        print(ex)
         raise ex
     except Exception as ex:  # Bad. >:[
+        print(ex)
         raise ex
 
 
@@ -602,7 +604,7 @@ def deleteDataToSql(strCon, schema, table, where=[]):
             DELETE FROM [{}].[{}]
                 {}
         '''.format(ifexist, schema, table, where)
-    print(deleteData)
+    # print(deleteData)
     engineCon(strCon).execute(
         sat(
             deleteData
@@ -611,7 +613,7 @@ def deleteDataToSql(strCon, schema, table, where=[]):
 
 
 def depure(strCon, df, schema, table, depureColumns):
-    print(df)
+    # print(df)
     depure = df.loc[:, depureColumns].drop_duplicates(subset=depureColumns)
 
     # print(depure.shape[0])
