@@ -539,8 +539,7 @@ def alchemy_col(name, type, leng):
     return Column(name, switch.get(type, String(leng)))
 
 
-# @affectedRows
-# @Profiler.profile
+@affectedRows
 def insertDataToSql_Alchemy(strCon, schema, table, data, truncate=False, depureColumns=[], index=False, n=10000):
 
     Columns = createTable(strCon, schema, table, data, index)
